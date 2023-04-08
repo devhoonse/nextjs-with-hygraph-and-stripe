@@ -7,6 +7,11 @@ export default gql`
             name
             price
             slug
+            description
+            images {
+                id
+                url
+            }
         }
     }
 `;

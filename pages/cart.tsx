@@ -1,11 +1,12 @@
+import Link from "next/link";
 import {useContext, useEffect, useState} from "react";
 import {Box, Button, Divider, Flex, Text} from "@chakra-ui/react";
-import CartContext from "@/lib/context/Cart";
 import {Product} from "@/shared/types/product";
 import graphql from "@/lib/graphql";
+import {getStripe} from "@/lib/stripe";
+import CartContext from "@/lib/context/Cart";
 import getProductsByIDs from "@/lib/graphql/queries/getProductsByIDs";
 import getTotalPrice from "@/utils/cart/getTotalPrice";
-import Link from "next/link";
 
 /**
  * 페이지 : /cart
@@ -27,6 +28,42 @@ function CartPage() {
    * 장바구니에 최소 1 종류의 상품이라도 들어 있는지 여부를 확인합니다.
    */
   const hasProducts = Object.keys(items).length > 0;
+
+  /**
+   * 결제 API (/api/checkout) 를 호출하여 Stripe 로 결제 요청을 전송합니다.
+   */
+  const handlePayment = async () => {
+
+    /**
+     * Stripe 클라이언트를 불러옵니다.
+     */
+    const stripe = await getStripe();
+
+    /**
+     * POST /api/checkout { items } 요청에 대한 응답입니다.
+     */
+    const checkoutResponse = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        items
+      })
+    });
+
+    /*
+      생성된 Stripe 결제 세션 정보를 읽어옵니다.
+     */
+    const { stripeSession } = await checkoutResponse.json();
+
+    /*
+      결제 세션에 대한 결제 페이지로 이동합니다.
+     */
+    await stripe?.redirectToCheckout({
+      sessionId: stripeSession.id
+    });
+  };
 
   /*
     페이지 컴포넌트가 브라우저에 처음 마운트되었을 때 실행할 동작입니다.
@@ -114,7 +151,10 @@ function CartPage() {
                 Total: €
                 {getTotalPrice(items, products)}
               </Text>
-              <Button colorScheme="blue">
+              <Button
+                colorScheme="blue"
+                onClick={handlePayment}
+              >
                 Pay Now
               </Button>
             </Flex>
